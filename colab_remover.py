@@ -72,23 +72,27 @@ def patch_remwm():
     else:
         print("remwm.py already patched or code structure changed.")
 
-# 3. Main processing function
-def process_watermark(input_path, output_dir, detection_skip=1, fade_in=0.0, fade_out=0.0, max_bbox=10.0):
-    # Import locally after installation
+# 3. Process a single file
+def process_single_file(file_path, detection_skip=1, fade_in=0.0, fade_out=0.0, max_bbox=10.0):
     import torch
     from loguru import logger
     from remwm import main as remwm_main
     
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Using device: {device}")
+    file_path = Path(file_path)
+    if "_wmr" in file_path.stem:
+        print(f"Skipping already processed file: {file_path}")
+        return
+
+    output_path = file_path.parent / f"{file_path.stem}_wmr{file_path.suffix}"
     
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-    
+    print(f"\n--- Processing: {file_path.name} ---")
+    print(f"Saves to: {output_path.name}")
+
     # Prepare arguments for the CLI
+    # We pass file_path and output_path directly
     args = [
-        str(input_path),
-        str(output_dir),
+        str(file_path),
+        str(output_path),
         "--max-bbox-percent", str(max_bbox),
         "--detection-skip", str(detection_skip),
         "--fade-in", str(fade_in),
@@ -96,22 +100,45 @@ def process_watermark(input_path, output_dir, detection_skip=1, fade_in=0.0, fad
         "--overwrite"
     ]
     
-    print(f"Starting processing: {input_path}")
-    print(f"Settings: skip={detection_skip}, fade_in={fade_in}, fade_out={fade_out}, max_bbox={max_bbox}%")
-    
     try:
-        # We use sys.argv trick to call the click-managed main function
+        # Save original argv
+        original_argv = sys.argv
         sys.argv = ["remwm.py"] + args
         remwm_main()
-        print(f"Processing complete! Results saved in: {output_dir}")
+        sys.argv = original_argv
+        print(f"Successfully processed: {file_path.name}")
     except Exception as e:
-        print(f"Error during processing: {e}")
+        print(f"Error processing {file_path.name}: {e}")
+
+# 4. Main processing function (handles folder or file)
+def process_watermark(input_path, detection_skip=1, fade_in=0.0, fade_out=0.0, max_bbox=10.0):
+    import torch
+    from loguru import logger
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Using device: {device}")
+    
+    input_path = Path(input_path)
+    
+    if input_path.is_dir():
+        # Supported extensions
+        extensions = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.jpg', '.jpeg', '.png', '.webp')
+        files = [f for f in input_path.iterdir() if f.is_file() and f.suffix.lower() in extensions]
+        
+        if not files:
+            print(f"No supported media files found in {input_path}")
+            return
+            
+        print(f"Found {len(files)} files to process in {input_path}")
+        for f in files:
+            process_single_file(f, detection_skip, fade_in, fade_out, max_bbox)
+    else:
+        process_single_file(input_path, detection_skip, fade_in, fade_out, max_bbox)
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Watermark Removal for Google Colab")
+    parser = argparse.ArgumentParser(description="Watermark Removal for Google Colab/Local")
     parser.add_argument("input", help="Path to input image, video, or folder")
-    parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
     parser.add_argument("--skip", type=int, default=1, help="Detection skip for videos (1-10, default: 1)")
     parser.add_argument("--fade-in", type=float, default=0.0, help="Fade-in expansion in seconds")
     parser.add_argument("--fade-out", type=float, default=0.0, help="Fade-out expansion in seconds")
@@ -126,4 +153,4 @@ if __name__ == "__main__":
     patch_remwm()
     
     if not args.setup:
-        process_watermark(args.input, args.output, args.skip, args.fade_in, args.fade_out, args.max_bbox)
+        process_watermark(args.input, args.skip, args.fade_in, args.fade_out, args.max_bbox)

@@ -1,59 +1,59 @@
-# Watermark Remover for Video (AI-Powered)
+# AI Watermark Remover for Video (Colab Ready)
 
-This repository provides an AI-powered tool to remove watermarks from videos and images. It leverages Microsoft's **Florence-2** for precise watermark detection and **LaMA (Large Mask Inpainting)** for seamless removal.
+The simplest AI tool to remove watermarks from videos and images. Optimized for Google Colab with high-quality output and audio preservation.
 
-## 🚀 Optimized for Google Colab
-
-This version is specifically optimized for **Google Colab**, ensuring:
-- **Audio Preservation**: Merges original audio back into the processed video.
-- **High Quality**: Uses `libx264` with high-quality settings (`CRF 18`).
-- **GPU Acceleration**: Automatically utilizes Colab's T4 GPU for fast processing.
+## ✨ Features
+- **One-Command Setup**: Automatically installs all AI models and dependencies.
+- **Folder Support**: Pass a folder path to process all videos/images at once.
+- **Smart Naming**: Saves results as `filename_wmr.mp4` in the same folder.
+- **High Quality**: Uses LaMA inpainting and high-quality `libx264` encoding.
+- **Audio Preservation**: Keeps the original audio from your videos.
 
 ---
 
-## 📖 How to Use on Google Colab
+## 🚀 How to Use on Google Colab (Fastest)
 
-### 1. Set up the Environment
-Open a new notebook in [Google Colab](https://colab.research.google.com/) and ensure you are using a **GPU** (Edit -> Notebook settings -> Hardware accelerator -> T4 GPU).
+### 1. Set Up Google Colab
+Open [Google Colab](https://colab.research.google.com/) and go to **Edit -> Notebook settings**. Select **T4 GPU** as the hardware accelerator.
 
-### 2. Prepare the Repository
-Run this in a code cell:
+### 2. Run the Program
+Copy and paste this into a code cell in Colab:
+
 ```python
+# 1. Clone the repository
 !git clone https://github.com/ajithvnr2001/watermark-remover-video.git
 %cd watermark-remover-video
 !apt-get install -y ffmpeg
-```
 
-### 3. Run the Remover
-Upload your video/image to the Colab sidebar (folder icon on the left) and run:
-
-```python
-# Basic usage for a video
-!python colab_remover.py "your_video.mp4" --output "output_folder"
-
-# For high precision (handles fade-in/out and every frame)
-!python colab_remover.py "your_video.mp4" --output "output_folder" --skip 1 --fade-in 0.5 --fade-out 0.5
+# 2. Run on a folder (Upload your videos/images to a folder in Colab first)
+!python colab_remover.py "/content/your_folder"
 ```
 
 ---
 
-## 🛠️ Key CLI Options
+## 🛠️ Advanced Options
 
-| Option | Description |
-|--------|-------------|
-| `--output` | Output directory where processed files are saved. |
-| `--skip` | Processes every N frames (1-10). Use `1` for best quality. |
-| `--max-bbox` | Max watermark size as % of image (default: 10). Increase if watermark is large. |
-| `--fade-in` | Extend mask backwards by N seconds (for fading watermarks). |
-| `--fade-out` | Extend mask forwards by N seconds (for fading watermarks). |
+You can adjust the processing by adding these flags:
+
+```bash
+# Example with options:
+!python colab_remover.py "/content/input" --skip 1 --fade-in 0.5 --max-bbox 15
+```
+
+| Flag | Description |
+|------|-------------|
+| `--skip` | Processes every N frames (1-10). Default is `1` (best quality). |
+| `--max-bbox` | Max watermark size as % of image. Default is `10`. Increase if watermark is huge. |
+| `--fade-in` | Seconds to look *before* a watermark appears (for fading watermarks). |
+| `--fade-out` | Seconds to keep masking *after* a watermark disappears. |
 
 ---
 
 ## 📁 Repository Structure
-- `remwm.py`: Core AI logic for detection and inpainting.
-- `colab_remover.py`: Wrapper script for dependency installation and high-quality encoding.
-- `utils.py`: Support functions for image processing.
-- `requirements.txt`: Python dependencies.
+- `colab_remover.py`: The only file you need to run. Handles everything automatically.
+- `remwm.py`: The engine for AI detection and removal.
+- `utils.py`: Support utilities.
+- `requirements.txt`: List of dependencies.
 
 ## 📜 Credits
 Based on the original implementation by [D-Ogi](https://github.com/D-Ogi/WatermarkRemover-AI).
