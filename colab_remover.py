@@ -60,7 +60,8 @@ def patch_remwm():
         content = f.read()
     
     # fix 1: Update FFmpeg merge command to use libx264 
-    content = content.replace('"-c:v", "copy",', '"-c:v", "libx264", "-crf", "18", "-preset", "veryfast",')
+    # Using CRF 17 for visually lossless archival quality
+    content = content.replace('"-c:v", "copy",', '"-c:v", "libx264", "-crf", "17", "-preset", "veryfast",')
     
     # fix 2: Fix dtype mismatch error (Input type float and bias type Half)
     # Force float32 for Florence-2 loading
