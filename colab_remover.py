@@ -19,7 +19,7 @@ def install_dependencies():
         # Install core dependencies with specific versions to avoid conflicts
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", 
                         "transformers>=4.50.0", "diffusers>=0.30.0", "numpy<2",
-                        "opencv-python-headless", "Pillow>=10.0.0", "loguru", "click", "tqdm", "psutil", "pyyaml"])
+                        "opencv-python-headless<4.11", "Pillow>=10.0.0", "loguru", "click", "tqdm", "psutil", "pyyaml"])
         
         # Install iopaint without dependencies to avoid resolver conflicts
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "iopaint"])
@@ -48,9 +48,9 @@ def setup_models():
     else:
         print("LaMA model already exists.")
 
-# 2.5 Patch remwm.py for quality
+# 2.5 Patch remwm.py for quality and bug fixes
 def patch_remwm():
-    print("Patching remwm.py for better quality...")
+    print("Patching remwm.py for quality and stability...")
     remwm_path = Path("remwm.py")
     if not remwm_path.exists():
         print("remwm.py not found, skipping patch.")
@@ -59,18 +59,25 @@ def patch_remwm():
     with open(remwm_path, "r") as f:
         content = f.read()
     
-    # Update FFmpeg merge command to use libx264 instead of copy
-    # This ensures high quality re-encoding
-    old_code = '"-c:v", "copy",'
-    new_code = '"-c:v", "libx264", "-crf", "18", "-preset", "veryfast",'
+    # fix 1: Update FFmpeg merge command to use libx264 
+    content = content.replace('"-c:v", "copy",', '"-c:v", "libx264", "-crf", "18", "-preset", "veryfast",')
     
-    if old_code in content:
-        content = content.replace(old_code, new_code)
-        with open(remwm_path, "w") as f:
-            f.write(content)
-        print("remwm.py patched successfully (High Quality enabled).")
-    else:
-        print("remwm.py already patched or code structure changed.")
+    # fix 2: Fix dtype mismatch error (Input type float and bias type Half)
+    # Force float32 for Florence-2 loading
+    content = content.replace(
+        'from_pretrained("florence-community/Florence-2-large").to(device)',
+        'from_pretrained("florence-community/Florence-2-large", torch_dtype=torch.float32).to(device)'
+    )
+    
+    # fix 3: Force input dtype match in identity function
+    content = content.replace(
+        'inputs = {k: v.to(device) for k, v in inputs.items()}',
+        'inputs = {k: v.to(device, dtype=model.dtype) if v.is_floating_point() else v.to(device) for k, v in inputs.items()}'
+    )
+
+    with open(remwm_path, "w") as f:
+        f.write(content)
+    print("remwm.py patched successfully.")
 
 # 3. Process a single file
 def process_single_file(file_path, detection_skip=1, fade_in=0.0, fade_out=0.0, max_bbox=10.0):
@@ -80,16 +87,13 @@ def process_single_file(file_path, detection_skip=1, fade_in=0.0, fade_out=0.0, 
     
     file_path = Path(file_path)
     if "_wmr" in file_path.stem:
-        print(f"Skipping already processed file: {file_path}")
         return
 
     output_path = file_path.parent / f"{file_path.stem}_wmr{file_path.suffix}"
     
     print(f"\n--- Processing: {file_path.name} ---")
-    print(f"Saves to: {output_path.name}")
-
+    
     # Prepare arguments for the CLI
-    # We pass file_path and output_path directly
     args = [
         str(file_path),
         str(output_path),
@@ -101,12 +105,10 @@ def process_single_file(file_path, detection_skip=1, fade_in=0.0, fade_out=0.0, 
     ]
     
     try:
-        # Save original argv
         original_argv = sys.argv
         sys.argv = ["remwm.py"] + args
         remwm_main()
         sys.argv = original_argv
-        print(f"Successfully processed: {file_path.name}")
     except Exception as e:
         print(f"Error processing {file_path.name}: {e}")
 
@@ -121,15 +123,15 @@ def process_watermark(input_path, detection_skip=1, fade_in=0.0, fade_out=0.0, m
     input_path = Path(input_path)
     
     if input_path.is_dir():
-        # Supported extensions
-        extensions = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.jpg', '.jpeg', '.png', '.webp')
-        files = [f for f in input_path.iterdir() if f.is_file() and f.suffix.lower() in extensions]
+        # Only video extensions
+        extensions = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm')
+        files = sorted([f for f in input_path.iterdir() if f.is_file() and f.suffix.lower() in extensions])
         
         if not files:
-            print(f"No supported media files found in {input_path}")
+            print(f"No video files found in {input_path}")
             return
             
-        print(f"Found {len(files)} files to process in {input_path}")
+        print(f"Found {len(files)} videos to process in {input_path}")
         for f in files:
             process_single_file(f, detection_skip, fade_in, fade_out, max_bbox)
     else:
